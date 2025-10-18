@@ -1,5 +1,5 @@
 // ===============================
-// AI Voicebot – Schweizer Version
+// AI Voicebot – Schweizer Version (Railway-kompatibel)
 // ===============================
 
 import express from "express"; // Webserver
@@ -71,18 +71,13 @@ app.get("/", (req, res) => {
   res.send("🤖 Voicebot läuft! – Twilio Endpoint: /twilio/voice");
 });
 
-// 4️⃣ Health Check (damit Railway weiß: Bot lebt)
-app.get("/health", (req, res) => {
-  res.status(200).send("OK ✅");
-});
-
-// ✅ Server starten – Railway-kompatibel
-const PORT = process.env.PORT || 3000;
+// ---- Server starten (Railway-kompatibel) ----
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Voicebot läuft auf Port ${PORT}`);
 });
 
-// --- Keep Alive, damit Railway den Container nicht stoppt ---
+// --- Keep Alive ---
 setInterval(() => {
   console.log("⏳ Keep-alive ping 🟢");
-}, 1000 * 60 * 5); // alle 5 Minuten
+}, 1000 * 60 * 5);
