@@ -8,13 +8,14 @@ app.use(express.urlencoded({ extended: false }));
 const { VoiceResponse } = twilio;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-// 🧠 GPT-Funktion (versteht Schweizerdeutsch)
+// 🧠 GPT-Abfrage (versteht Dialekt, antwortet natürlich)
 async function askGPT(question) {
+  console.log("🧠 Frage an GPT:", question);
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -23,7 +24,7 @@ async function askGPT(question) {
           {
             role: "system",
             content:
-              "Du bisch en hilfsbereiti, sympathischi Assistentin im Schwiizerdütsch. Versteh au Dialäkt, und red locker und professionell. Wenn dä User e Termin oder Information will, frag gnau nach und bestätig’s.",
+              "Du bisch en sympathischi Assistentin, wo Schwiizerdütsch versteht und natürlich redet. Versteh au Hochdeutsch. Wenn du e Termin oder Information ghörsch, frag klar nach.",
           },
           { role: "user", content: question },
         ],
@@ -31,7 +32,11 @@ async function askGPT(question) {
     });
 
     const data = await response.json();
-    return data.choices?.[0]?.message?.content || "Ich ha di nöd verstande, chasch das bitte nomal säge?";
+    const reply =
+      data.choices?.[0]?.message?.content ||
+      "Ich ha di nöd verstande, chasch das bitte nomal säge?";
+    console.log("🤖 GPT-Antwort:", reply);
+    return reply;
   } catch (err) {
     console.error("❌ GPT Fehler:", err);
     return "Oh nei, öppis isch schief gloffe. Probier bitte nomal.";
@@ -40,32 +45,45 @@ async function askGPT(question) {
 
 // 🎧 Twilio Voice Webhook
 app.post("/twilio/voice", async (req, res) => {
+  console.log("📞 Request Body:", req.body);
+
   const twiml = new VoiceResponse();
   const speechResult = req.body.SpeechResult;
   const isNewCall = !speechResult;
 
   try {
     if (isNewCall) {
-      // Begrüssung
+      // Begrüssung beim Start
       const gather = twiml.gather({
         input: "speech",
         action: "/twilio/voice",
         method: "POST",
-        language: "de-CH", // 🇨🇭 Schweizerdeutsch besser erkannt
-        timeout: 7,
+        language: "de-DE", // 🇩🇪 besseres Erkennen als de-CH
+        timeout: 8,
       });
-      gather.say({ voice: "Polly.Marlene" }, "Grüezi mitenand! Ich bi dä digitale Assistent. Wie cha ich Ihne hälfe?");
-    } else {
-      const gptReply = await askGPT(speechResult);
+      gather.say(
+        { voice: "Polly.Marlene" },
+        "Grüezi mitenand! Ich bi dä digitale Assistent. Wie cha ich Ihne hälfe?"
+      );
+    } else if (speechResult && speechResult.trim() !== "") {
+      console.log("🗣️ Erkannt:", speechResult);
 
+      const gptReply = await askGPT(speechResult);
       const gather = twiml.gather({
         input: "speech",
         action: "/twilio/voice",
         method: "POST",
-        language: "de-CH",
-        timeout: 7,
+        language: "de-DE",
+        timeout: 8,
       });
       gather.say({ voice: "Polly.Marlene" }, gptReply);
+    } else {
+      console.warn("⚠️ Keine Sprache erkannt!");
+      twiml.say(
+        { voice: "Polly.Marlene" },
+        "Ich ha di nöd verstande. Chasch das bitte nomal säge?"
+      );
+      twiml.redirect("/twilio/voice");
     }
 
     res.type("text/xml");
@@ -82,10 +100,12 @@ app.post("/twilio/voice", async (req, res) => {
   }
 });
 
-// 🌍 Test Route
+// 🌍 Test-Route
 app.get("/", (req, res) => {
   res.send("🤖 Voicebot läuft! Endpoint: /twilio/voice");
 });
 
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log(`🚀 Voicebot läuft uf Port ${PORT}`));
+app.listen(PORT, () =>
+  console.log(`🚀 Voicebot läuft uf Port ${PORT} (Twilio bereit)`)
+);
