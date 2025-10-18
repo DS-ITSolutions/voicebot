@@ -1,18 +1,15 @@
 {
   "name": "ai-voicebot",
   "version": "1.0.0",
-  "description": "Ein AI Voicebot mit Twilio und Express – optimiert für Railway",
+  "description": "AI Voicebot mit Twilio und Express für Railway",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "start": "node index.js"
   },
-  "keywords": ["twilio", "voicebot", "express", "railway"],
-  "author": "Davide Scanniello",
-  "license": "ISC",
   "dependencies": {
-    "body-parser": "^2.2.0",
-    "express": "^5.1.0",
-    "twilio": "^5.10.3"
+    "body-parser": "^1.20.2",
+    "express": "^4.18.2",
+    "twilio": "^4.19.1"
   }
 }
