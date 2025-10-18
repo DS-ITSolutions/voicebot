@@ -1,84 +1,83 @@
 import express from "express";
-import twilio from "twilio";
 import fetch from "node-fetch";
+import twilio from "twilio";
 
 const app = express();
 app.use(express.urlencoded({ extended: false }));
 
-// === OpenAI API Key aus Railway Environment ===
-const openai_api_key = process.env.OPENAI_API_KEY;
+const { VoiceResponse } = twilio;
 
-// === Twilio Voice Webhook ===
+// Dein OpenAI API Key
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
+// 🧠 GPT-Anfrage
+async function askGPT(question) {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${OPENAI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "Du bisch en hilfsbereite, sympathische Assistentin, wo im Schwiizerdütsch redt. Antworte natürlich, kurz und freundlich.",
+        },
+        { role: "user", content: question },
+      ],
+    }),
+  });
+
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || "Ich ha di nöd verstande. Chasch das bitte nomal säge?";
+}
+
+// 🎧 Voice-Webhook
 app.post("/twilio/voice", async (req, res) => {
-  const VoiceResponse = twilio.twiml.VoiceResponse;
   const twiml = new VoiceResponse();
+  const speechResult = req.body.SpeechResult;
+  const isNewCall = !speechResult;
 
-  try {
-    // Wenn Twilio Sprache erkannt hat
-    const speech = req.body.SpeechResult || "Hallo!";
-
-    console.log("📞 Eingabe erkannt:", speech);
-
-    // === Anfrage an ChatGPT ===
-    const gptResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${openai_api_key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `
-              Du bist ein freundlicher, professioneller Schweizer KI-Assistent.
-              Du sprichst in Schweizer Hochdeutsch, aber mit leichtem schweizerischem Ausdruck.
-              Halte die Antworten kurz, natürlich und angenehm im Tonfall.
-            `
-          },
-          { role: "user", content: speech }
-        ],
-      }),
-    });
-
-    const data = await gptResponse.json();
-    const antwort = data.choices?.[0]?.message?.content?.trim() || "Ich ha di nöd verstande, chasch das bitte nomal säge?";
-
-    console.log("🤖 Antwort von GPT:", antwort);
-
-    // === Sprachausgabe (Text-to-Speech) ===
-    twiml.say(
-      { language: "de-CH", voice: "Polly.Marlene" },
-      antwort
-    );
-
-    // Optional: Nach der Antwort erneut zuhören
-    twiml.gather({
+  if (isNewCall) {
+    // 🗣️ Begrüssung beim Start
+    const gather = twiml.gather({
       input: "speech",
       action: "/twilio/voice",
       method: "POST",
-      language: "de-CH"
+      language: "de-DE", // besseres Deutsch-Recognition
+      timeout: 5,
     });
-
-    res.type("text/xml");
-    res.send(twiml.toString());
-
-  } catch (err) {
-    console.error("❌ Fehler:", err);
-    twiml.say(
-      { language: "de-CH", voice: "Polly.Marlene" },
-      "Entschuldigung, es isch öppis schief gloffe."
+    gather.say(
+      { voice: "Polly.Vicki" },
+      "Grüezi! Ich bi dä Voicebot vo dim Gschäft. Wie cha ich Ihne hälfe?"
     );
-    res.type("text/xml");
-    res.send(twiml.toString());
+  } else {
+    // 🎙️ Antwort mit GPT
+    const gptReply = await askGPT(speechResult);
+
+    const gather = twiml.gather({
+      input: "speech",
+      action: "/twilio/voice",
+      method: "POST",
+      language: "de-DE",
+      timeout: 5,
+    });
+    gather.say(
+      { voice: "Polly.Marlene" },
+      gptReply
+    );
   }
+
+  res.type("text/xml");
+  res.send(twiml.toString());
 });
 
 app.get("/", (req, res) => {
-  res.send("🎙️ Voicebot läuft! Twilio Endpoint: /twilio/voice");
+  res.send("🤖 Voicebot läuft! Twilio Endpoint: /twilio/voice");
 });
 
-// Railway Port
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log(`🚀 Voicebot läuft auf Port ${PORT}`));
