@@ -1,15 +1,20 @@
 {
   "name": "ai-voicebot",
   "version": "1.0.0",
-  "description": "Schweizer AI Voicebot für Twilio & Railway",
+  "description": "Ein intelligenter Schweizerdeutscher Voicebot mit Twilio & ChatGPT",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "body-parser": "^1.20.2",
     "express": "^4.18.2",
-    "twilio": "^4.21.0"
-  }
+    "twilio": "^4.21.0",
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "Dein Name",
+  "license": "MIT"
 }
