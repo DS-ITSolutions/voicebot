@@ -1,22 +1,22 @@
 // ===============================
-// AI Voicebot – Schweizer Version
+// AI Voicebot – Schweizer Version (Railway-Stable)
 // ===============================
 
-import express from "express"; // Webserver
-import bodyParser from "body-parser"; // POST-Daten lesen
-import twilio from "twilio"; // Twilio SDK
+import express from "express";
+import bodyParser from "body-parser";
+import twilio from "twilio";
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
 
-// --- Logging, um Twilio Requests zu sehen ---
+// --- Logging ---
 app.use((req, res, next) => {
   console.log(`📞 ${req.method} ${req.url}`);
   next();
 });
 
-// 1️⃣ Eingehender Anruf
+// --- Eingehender Anruf ---
 app.post("/twilio/voice", (req, res) => {
   try {
     const twiml = new VoiceResponse();
@@ -28,7 +28,6 @@ app.post("/twilio/voice", (req, res) => {
     });
 
     gather.say("Hoi! Willkomme im Fitnessstudio. Worum geit’s?");
-
     res.type("text/xml");
     res.send(twiml.toString());
     console.log("✅ /twilio/voice ausgeliefert");
@@ -38,7 +37,7 @@ app.post("/twilio/voice", (req, res) => {
   }
 });
 
-// 2️⃣ Verarbeitung der gesprochenen Antwort
+// --- Verarbeitung Sprache ---
 app.post("/twilio/process-speech", (req, res) => {
   try {
     const speechText = req.body.SpeechResult || "";
@@ -47,7 +46,6 @@ app.post("/twilio/process-speech", (req, res) => {
     console.log(`🗣️ Benutzer sagte: "${speechText}"`);
 
     let antwort = "Ich han das nid genau verstande. Chasch das bitte wiederhole?";
-
     if (speechText.toLowerCase().includes("termin")) {
       antwort = "Okay, für wele Tag wotsch du en Termin?";
     } else if (speechText.toLowerCase().includes("zeit")) {
@@ -66,18 +64,19 @@ app.post("/twilio/process-speech", (req, res) => {
   }
 });
 
-// 3️⃣ Root-Route (zum Test im Browser)
+// --- Testroute im Browser ---
 app.get("/", (req, res) => {
+  res.setHeader("Connection", "keep-alive");
   res.send("🤖 Voicebot läuft! – Twilio Endpoint: /twilio/voice");
 });
 
-// 4️⃣ Server starten (Railway kompatibel)
+// --- Server starten ---
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Voicebot läuft auf Port ${PORT}`);
 });
 
-// 5️⃣ Keep Alive, damit Railway den Container nicht stoppt
+// --- Keep Alive ---
 setInterval(() => {
   console.log("⏳ Keep-alive ping 🟢");
-}, 1000 * 60 * 5); // alle 5 Minuten
+}, 1000 * 60 * 5);
