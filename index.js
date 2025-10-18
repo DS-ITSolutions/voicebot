@@ -50,6 +50,6 @@ app.post("/twilio/process-speech", (req, res) => {
   }
 });
 
-// Server starten (Railway Port)
+// Server starten
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Bot läuft auf Port ${PORT}`));
