@@ -1,3 +1,7 @@
+// ===============================
+// AI Voicebot – Schweizer Version
+// ===============================
+
 import express from "express"; // Webserver
 import bodyParser from "body-parser"; // POST-Daten lesen
 import twilio from "twilio"; // Twilio SDK
@@ -6,7 +10,13 @@ const VoiceResponse = twilio.twiml.VoiceResponse;
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
 
-// 1️⃣ Route für eingehende Anrufe
+// --- Logging, um Twilio Requests zu sehen ---
+app.use((req, res, next) => {
+  console.log(`📞 ${req.method} ${req.url}`);
+  next();
+});
+
+// 1️⃣ Eingehender Anruf
 app.post("/twilio/voice", (req, res) => {
   try {
     const twiml = new VoiceResponse();
@@ -21,22 +31,27 @@ app.post("/twilio/voice", (req, res) => {
 
     res.type("text/xml");
     res.send(twiml.toString());
+    console.log("✅ /twilio/voice ausgeliefert");
   } catch (error) {
-    console.error("Fehler in /twilio/voice:", error);
+    console.error("❌ Fehler in /twilio/voice:", error);
     res.status(500).send("Internal Server Error");
   }
 });
 
-// 2️⃣ Route für Verarbeitung der gesprochenen Antwort
+// 2️⃣ Verarbeitung der gesprochenen Antwort
 app.post("/twilio/process-speech", (req, res) => {
   try {
     const speechText = req.body.SpeechResult || "";
     const twiml = new VoiceResponse();
 
+    console.log(`🗣️ Benutzer sagte: "${speechText}"`);
+
     let antwort = "Ich han das nid genau verstande. Chasch das bitte wiederhole?";
 
     if (speechText.toLowerCase().includes("termin")) {
       antwort = "Okay, für wele Tag wotsch du en Termin?";
+    } else if (speechText.toLowerCase().includes("zeit")) {
+      antwort = "Mir hei offe vo 8 bis 20 Uhr, Montag bis Friitig.";
     }
 
     twiml.say({ language: "de-DE" }, antwort);
@@ -44,12 +59,23 @@ app.post("/twilio/process-speech", (req, res) => {
 
     res.type("text/xml");
     res.send(twiml.toString());
+    console.log("✅ Antwort geschickt:", antwort);
   } catch (error) {
-    console.error("Fehler in /twilio/process-speech:", error);
+    console.error("❌ Fehler in /twilio/process-speech:", error);
     res.status(500).send("Internal Server Error");
   }
 });
 
-// Server starten
+// 3️⃣ Root-Route (zum Test im Browser)
+app.get("/", (req, res) => {
+  res.send("🤖 Voicebot läuft! – Twilio Endpoint: /twilio/voice");
+});
+
+// Server starten (Railway kompatibel)
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Bot läuft auf Port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Bot läuft auf Port ${PORT}`));
+
+// --- Keep Alive, damit Railway den Container nicht stoppt ---
+setInterval(() => {
+  console.log("⏳ Keep-alive ping 🟢");
+}, 1000 * 60 * 5); // alle 5 Minuten
