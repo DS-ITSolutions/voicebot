@@ -1,79 +1,84 @@
-// ===============================
-// AI Voicebot – Schweizer Version (Railway-Stable)
-// ===============================
-
 import express from "express";
-import bodyParser from "body-parser";
 import twilio from "twilio";
+import fetch from "node-fetch";
 
-const VoiceResponse = twilio.twiml.VoiceResponse;
 const app = express();
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: false }));
 
-// --- Logging ---
-app.use((req, res, next) => {
-  console.log(`📞 ${req.method} ${req.url}`);
-  next();
-});
+// === OpenAI API Key aus Railway Environment ===
+const openai_api_key = process.env.OPENAI_API_KEY;
 
-// --- Eingehender Anruf ---
-app.post("/twilio/voice", (req, res) => {
-  const twiml = new VoiceResponse();
-  const gather = twiml.gather({
-    input: "speech",
-    action: "/twilio/process-speech",
-    language: "de-DE"
-  });
-  gather.say("Hoi! Willkomme im Fitnessstudio. Worum geit’s?");
-  res.type("text/xml");
-  res.send(twiml.toString());
-  console.log("✅ /twilio/voice ausgeliefert");
-});
-
-// --- Verarbeitung Sprache ---
-app.post("/twilio/process-speech", (req, res) => {
-  const speechText = req.body.SpeechResult || "";
+// === Twilio Voice Webhook ===
+app.post("/twilio/voice", async (req, res) => {
+  const VoiceResponse = twilio.twiml.VoiceResponse;
   const twiml = new VoiceResponse();
 
-  console.log(`🗣️ Benutzer sagte: "${speechText}"`);
+  try {
+    // Wenn Twilio Sprache erkannt hat
+    const speech = req.body.SpeechResult || "Hallo!";
 
-  let antwort = "Ich han das nid genau verstande. Chasch das bitte wiederhole?";
-  if (speechText.toLowerCase().includes("termin")) {
-    antwort = "Okay, für wele Tag wotsch du en Termin?";
-  } else if (speechText.toLowerCase().includes("zeit")) {
-    antwort = "Mir hei offe vo 8 bis 20 Uhr, Montag bis Friitig.";
+    console.log("📞 Eingabe erkannt:", speech);
+
+    // === Anfrage an ChatGPT ===
+    const gptResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${openai_api_key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `
+              Du bist ein freundlicher, professioneller Schweizer KI-Assistent.
+              Du sprichst in Schweizer Hochdeutsch, aber mit leichtem schweizerischem Ausdruck.
+              Halte die Antworten kurz, natürlich und angenehm im Tonfall.
+            `
+          },
+          { role: "user", content: speech }
+        ],
+      }),
+    });
+
+    const data = await gptResponse.json();
+    const antwort = data.choices?.[0]?.message?.content?.trim() || "Ich ha di nöd verstande, chasch das bitte nomal säge?";
+
+    console.log("🤖 Antwort von GPT:", antwort);
+
+    // === Sprachausgabe (Text-to-Speech) ===
+    twiml.say(
+      { language: "de-CH", voice: "Polly.Marlene" },
+      antwort
+    );
+
+    // Optional: Nach der Antwort erneut zuhören
+    twiml.gather({
+      input: "speech",
+      action: "/twilio/voice",
+      method: "POST",
+      language: "de-CH"
+    });
+
+    res.type("text/xml");
+    res.send(twiml.toString());
+
+  } catch (err) {
+    console.error("❌ Fehler:", err);
+    twiml.say(
+      { language: "de-CH", voice: "Polly.Marlene" },
+      "Entschuldigung, es isch öppis schief gloffe."
+    );
+    res.type("text/xml");
+    res.send(twiml.toString());
   }
-
-  twiml.say({ language: "de-DE" }, antwort);
-  twiml.redirect("/twilio/voice");
-
-  res.type("text/xml");
-  res.send(twiml.toString());
-  console.log("✅ Antwort geschickt:", antwort);
 });
 
-// --- Root-Route ---
 app.get("/", (req, res) => {
-  res.send("🤖 Voicebot läuft! Twilio-Endpoint: /twilio/voice");
+  res.send("🎙️ Voicebot läuft! Twilio Endpoint: /twilio/voice");
 });
 
-// --- Server starten ---
+// Railway Port
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Voicebot läuft auf Port ${PORT}`);
-});
-
-// --- Railway Keep Alive ---
-setInterval(() => {
-  console.log("⏳ Keep-alive ping 🟢");
-}, 1000 * 60 * 5);
-
-// --- Dummy HTTP-Ping an sich selbst (Railway erkennt so Aktivität) ---
-import http from "http";
-setInterval(() => {
-  http.get(`http://localhost:${PORT}`, (res) => {
-    console.log("🌍 Self-ping:", res.statusCode);
-  }).on("error", (err) => {
-    console.error("❌ Ping-Fehler:", err.message);
-  });
-}, 1000 * 60 * 2); // alle 2 Minuten
+app.listen(PORT, () => console.log(`🚀 Voicebot läuft auf Port ${PORT}`));
