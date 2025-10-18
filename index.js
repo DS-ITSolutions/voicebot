@@ -71,9 +71,16 @@ app.get("/", (req, res) => {
   res.send("🤖 Voicebot läuft! – Twilio Endpoint: /twilio/voice");
 });
 
-// Server starten (Railway kompatibel)
+// 4️⃣ Health Check (damit Railway weiß: Bot lebt)
+app.get("/health", (req, res) => {
+  res.status(200).send("OK ✅");
+});
+
+// ✅ Server starten – Railway-kompatibel
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Bot läuft auf Port ${PORT}`));
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Voicebot läuft auf Port ${PORT}`);
+});
 
 // --- Keep Alive, damit Railway den Container nicht stoppt ---
 setInterval(() => {
